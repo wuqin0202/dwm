@@ -14,6 +14,8 @@ static const char *colors[][3]      = {
 	[SchemeNorm] = { "#bbbbbb", "#222222", "#444444"},
 	[SchemeSel]  = { "#eeeeee", "#005577", "#005577"},
 };
+static const unsigned int gapi     = 10; 		/* 窗口与窗口间隔 */
+static const unsigned int gapo	  = 12;	    	/* 窗口与屏幕边的距离 */
 
 /* tagging */
 static const char *tags[] = { "", "", "", "", "", "", "", "﬏", "", "", "ﬄ", "﬐", "", "", ""}; // 最多 31 个
@@ -34,6 +36,7 @@ static const int lockfullscreen = 1; /* 1 will force focus on the fullscreen win
 static const Layout layouts[] = {
 	/* symbol     arrange function(不能为NULL) */
 	{ "﬿",        tile },    /* first entry is default */
+	{ "﩯",        grid },
 };
 /* key definitions */
 #define MODKEY Mod4Mask

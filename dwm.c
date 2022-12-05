@@ -178,6 +178,7 @@ static long getstate(Window w);
 static int gettextprop(Window w, Atom atom, char *text, unsigned int size);
 static void grabbuttons(Client *c, int focused);
 static void grabkeys(void);
+static void grid(Monitor *m);
 static void incnmaster(const Arg *arg);
 static void keypress(XEvent *e);
 static void killclient(const Arg *arg);
@@ -1723,35 +1724,76 @@ void tagmon(const Arg *arg)
 	sendmon(selmon->sel, dirtomon(arg->i));
 }
 
-void tile(Monitor *m)
+void
+tile(Monitor *m)
 {
-	unsigned int i, n, h, mw, my, ty;
+    unsigned int i, n, h, r, mw, my, ty;
+    Client *c;
+
+    for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
+    if (n == 0) return;
+
+    if (n > m->nmaster)
+        mw = m->nmaster ? (m->ww + gapi) * m->mfact : 0;
+    else
+        mw = m->ww - 2 * gapo + gapi;
+    for (i = 0, my = ty = gapo, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
+        if (i < m->nmaster) {
+            r = MIN(n, m->nmaster) - i;
+            h = (m->wh - my - gapo - gapi * (r - 1)) / r;
+            resize(c,
+                   m->wx + gapo,
+                   m->wy + my,
+                   mw - 2 * c->bw - gapi,
+                   h - 2 * c->bw,
+                   0);
+            my += HEIGHT(c) + gapi;
+        } else {
+            r = n - i;
+            h = (m->wh - ty - gapo - gapi * (r - 1)) / r;
+            resize(c,
+                   m->wx + mw + gapo,
+                   m->wy + ty,
+                   m->ww - mw - 2 * c->bw - 2 * gapo,
+                   h - 2* c->bw,
+                   0);
+            ty += HEIGHT(c) + gapi;
+        }
+}
+
+void
+grid(Monitor *m)
+{
+	unsigned int i, j, n;
+	unsigned int cx, cy, cw, ch;
+	unsigned int cols, rows;
+	char overcols;
 	Client *c;
 
-	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++)
-		;
-	if (n == 0)
-		return;
+	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
+	if (n == 0) return;
+	for (cols=1; cols <= n/2; cols++)
+		if (cols * cols >= n)
+			break;
+	rows = ((cols - 1) * cols >=n) ? cols - 1 : cols;
 
-	if (n > m->nmaster)
-		mw = m->nmaster ? m->ww * m->mfact : 0;
-	else
-		mw = m->ww;
-	for (i = my = ty = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
-		if (i < m->nmaster)
-		{
-			h = (m->wh - my) / (MIN(n, m->nmaster) - i);
-			resize(c, m->wx, m->wy + my, mw - (2 * c->bw), h - (2 * c->bw), 0);
-			if (my + HEIGHT(c) < m->wh)
-				my += HEIGHT(c);
-		}
+	ch = (m->wh - 2 * gapo - (rows - 1) * gapi) / rows;
+	cw = (m->ww - 2 * gapo - (cols - 1) * gapi) / cols;
+
+	overcols = (char)(n % cols);
+	for (i = 0, c = nexttiled(m->clients), cy = gapo; i < rows; i++) {
+		if (i == rows - 1 && overcols)
+			cx =  (m->ww - (n - i * cols) * (cw + gapi) + gapi) / 2;
 		else
-		{
-			h = (m->wh - ty) / (n - i);
-			resize(c, m->wx + mw, m->wy + ty, m->ww - mw - (2 * c->bw), h - (2 * c->bw), 0);
-			if (ty + HEIGHT(c) < m->wh)
-				ty += HEIGHT(c);
+			cx = gapo;
+		for (j = 0; j < cols; c = nexttiled(c->next), j++) {
+			if (!c) return;
+			resize(c, m->wx + cx, m->wy + cy, cw - 2 * c->bw, ch - 2 * c->bw, 0);
+			cx += cw + gapi;
 		}
+		cy += ch + gapi;
+	}
+
 }
 
 void togglebar(const Arg *arg)
