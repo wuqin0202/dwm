@@ -18,17 +18,23 @@ static const char *colors[][3]      = {
 };
 static const unsigned int gapi     = 10; 		/* 窗口与窗口间隔 */
 static const unsigned int gapo	  = 12;	    	/* 窗口与屏幕边的距离 */
+static const unsigned int defaulttag = 5;		/* 默认选中的tag的下标 */
 
 /* tagging */
 static const char *tags[] = { "", "", "", "", "", "", "", "﬏", "", "", "ﬄ", "﬐", "", "", ""}; // 最多 31 个
+
+/* tagcmds */
+static const char *tagcmds[] = { NULL, NULL, NULL, NULL, NULL,\
+	"st", "chromium", NULL, "pcmanfm", "wps", "tencent-qq", "electronic-wechat-uos-bin", "netease-cloud-music-gtk4", "virt-manager", "obs"};
 
 static const Rule rules[] = {
 	/* xprop(1):
 	 *	WM_CLASS(STRING) = instance, class
 	 *	WM_NAME(STRING) = title
 	 */
-	/* class      instance    title       tags mask     isfloating   monitor */
-	{ "floatst",  NULL,       NULL,       0,            1,           -1 },
+	/* class			instance    title       tags mask     isfloating   isbottom   monitor */
+	{ "floatst",		NULL,       NULL,       0,            1,           0,			-1 },
+	{ "st-256color",	NULL,       NULL,       0,            0,           1,			-1 },
 };
 
 /* layout(s) */

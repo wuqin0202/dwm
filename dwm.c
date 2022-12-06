@@ -95,7 +95,7 @@ struct Client {
 	int basew, baseh, incw, inch, maxw, maxh, minw, minh, hintsvalid;
 	int bw, oldbw;
 	unsigned int tags;
-	int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen;
+	int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen, isbottom;
 	Client *next;
 	Client *snext;
 	Monitor *mon;
@@ -141,6 +141,7 @@ typedef struct {
 	const char *title;
 	unsigned int tags;
 	int isfloating;
+	int isbottom;
 	int monitor;
 } Rule;
 
@@ -150,6 +151,7 @@ static int applysizehints(Client *c, int *x, int *y, int *w, int *h, int interac
 static void arrange(Monitor *m);
 static void arrangemon(Monitor *m);
 static void attach(Client *c);
+static void attachbottom(Client *c);
 static void attachstack(Client *c);
 static void buttonpress(XEvent *e);
 static void checkotherwm(void);
@@ -167,6 +169,7 @@ static Monitor *dirtomon(int dir);
 static void drawbar(Monitor *m);
 static void drawbars(void);
 static void enternotify(XEvent *e);
+static void exectagnoc(void);
 static void expose(XEvent *e);
 static void focus(Client *c);
 static void focusin(XEvent *e);
@@ -297,6 +300,7 @@ applyrules(Client *c)
 	/* rule matching */
 	c->isfloating = 0;
 	c->tags = 0;
+	c->isbottom = 0;
 	XGetClassHint(dpy, c->win, &ch);
 	class = ch.res_class ? ch.res_class : broken;
 	instance = ch.res_name ? ch.res_name : broken;
@@ -309,6 +313,7 @@ applyrules(Client *c)
             (!r->instance || strstr(instance, r->instance)))
 		{
 			c->isfloating = r->isfloating;
+			c->isbottom = r->isbottom;
 			c->tags |= r->tags;
 			for (m = mons; m && m->num != r->monitor; m = m->next);
 			if (m)
@@ -434,9 +439,18 @@ attach(Client *c)
 	c->mon->clients = c;
 }
 
-// 将 c 连接在显示器 stack 的头部
 void
-attachstack(Client *c)
+attachbottom(Client *c)
+{
+	Client **tc;
+
+	for (tc = &c->mon->clients; *tc; tc = &(*tc)->next);
+	*tc = c;
+	c->next = NULL;
+}
+
+// 将 c 连接在显示器 stack 的头部
+void attachstack(Client *c)
 {
 	c->snext = c->mon->stack;
 	c->mon->stack = c;
@@ -696,7 +710,8 @@ createmon(void)
 	Monitor *m;
 
 	m = ecalloc(1, sizeof(Monitor));
-	m->tagset[0] = m->tagset[1] = 1;
+	m->tagset[0] = 1 << defaulttag;
+	m->tagset[1] = 1;
 	m->mfact = mfact;
 	m->nmaster = 1;
 	m->showbar = 1;
@@ -1135,7 +1150,10 @@ void manage(Window w, XWindowAttributes *wa)
 		c->isfloating = c->oldstate = trans != None || c->isfixed;
 	if (c->isfloating)
 		XRaiseWindow(dpy, c->win);
-	attach(c);
+	if (c->isbottom)
+		attachbottom(c);
+	else 
+		attach(c);
 	attachstack(c);
 	XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
 					(unsigned char *)&(c->win), 1);
@@ -1479,7 +1497,10 @@ void sendmon(Client *c, Monitor *m)
 	detachstack(c);
 	c->mon = m;
 	c->tags = m->tagset[m->seltags]; /* assign tags of target monitor */
-	attach(c);
+	if (c->isbottom)
+		attachbottom(c);
+	else
+		attach(c);
 	attachstack(c);
 	focus(NULL);
 	arrange(NULL);
@@ -1995,7 +2016,10 @@ int updategeom(void)
 				m->clients = c->next;
 				detachstack(c);
 				c->mon = mons;
-				attach(c);
+				if (c->isbottom)
+					attachbottom(c);
+				else
+					attach(c);
 				attachstack(c);
 			}
 			if (m == selmon)
@@ -2143,13 +2167,32 @@ void updatewmhints(Client *c)
 	}
 }
 
+// 若当前tag无窗口则执行对应的tagcmds 命令
+void
+exectagnoc(void)
+{
+	Client *c;
+	unsigned int n, i;
+
+	for(n = selmon->tagset[selmon->seltags], i = -1; n; n >>=1, i++);
+	n = 0;
+    for (c = selmon->clients; c; c = c->next)
+        if (ISVISIBLE(c)) n++;
+    if (n == 0 && tagcmds[i]) {
+        spawn(&(Arg)SHCMD(tagcmds[i]));
+    }
+}
+
 void view(const Arg *arg)
 {
-	if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags])
+	if ((arg->ui & TAGMASK) == selmon->tagset[selmon->seltags]) {
+		exectagnoc();
 		return;
+	}
 	selmon->seltags ^= 1; /* toggle sel tagset */
 	if (arg->ui & TAGMASK)
 		selmon->tagset[selmon->seltags] = arg->ui & TAGMASK;
+	exectagnoc();
 	focus(NULL);
 	arrange(selmon);
 }
