@@ -191,6 +191,7 @@ static void maprequest(XEvent *e);
 static void motionnotify(XEvent *e);
 static void movemouse(const Arg *arg);
 static Client *nexttiled(Client *c);
+static void pointertoclient(Client *c);
 static void pop(Client *c);
 static void propertynotify(XEvent *e);
 static void quit(const Arg *arg);
@@ -918,6 +919,7 @@ void focusmon(const Arg *arg)
 	unfocus(selmon->sel, 0);
 	selmon = m;
 	focus(NULL);
+    pointertoclient(selmon->sel);
 }
 
 void focusstack(const Arg *arg)
@@ -947,6 +949,7 @@ void focusstack(const Arg *arg)
 	if (c)
 	{
 		focus(c);
+        pointertoclient(c);
 		restack(selmon);
 	}
 }
@@ -1165,6 +1168,7 @@ void manage(Window w, XWindowAttributes *wa)
 	arrange(c->mon);
 	XMapWindow(dpy, c->win);
 	focus(NULL);
+    pointertoclient(selmon->sel);
 }
 
 void mappingnotify(XEvent *e)
@@ -1273,11 +1277,22 @@ nexttiled(Client *c)
 	return c;
 }
 
+void
+pointertoclient(Client *c)
+{
+    if (c)
+        XWarpPointer(dpy, None, root, 0, 0, 0, 0, c->x + c->w / 2, c->y + c->h / 2);
+    else
+        XWarpPointer(dpy, None, root, 0, 0, 0, 0, selmon->wx + selmon->ww / 2, selmon->wy + selmon->wh / 2);
+
+}
+
 void pop(Client *c)
 {
 	detach(c);
 	attach(c);
 	focus(c);
+    pointertoclient(c);
 	arrange(c->mon);
 }
 
@@ -1740,6 +1755,7 @@ void tag(const Arg *arg)
 		selmon->sel->tags = arg->ui & TAGMASK;
 		focus(NULL);
 		arrange(selmon);
+		view(arg);
 	}
 }
 
@@ -1748,6 +1764,7 @@ void tagmon(const Arg *arg)
 	if (!selmon->sel || !mons->next)
 		return;
 	sendmon(selmon->sel, dirtomon(arg->i));
+    focusmon(arg);
 }
 
 void
@@ -1841,6 +1858,7 @@ void togglefloating(const Arg *arg)
 		resize(selmon->sel, selmon->sel->x, selmon->sel->y,
 			   selmon->sel->w, selmon->sel->h, 0);
 	arrange(selmon);
+    pointertoclient(selmon->sel);
 }
 
 void toggleview(const Arg *arg)
@@ -1894,6 +1912,7 @@ unmanage(Client *c, int destroyed)
 	focus(NULL);
 	updateclientlist();
 	arrange(m);
+    pointertoclient(selmon->sel);
 }
 
 void unmapnotify(XEvent *e)
