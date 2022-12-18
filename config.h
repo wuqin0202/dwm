@@ -13,8 +13,9 @@ static const unsigned int alphas[][3]      = {
 };
 static const char *colors[][3]      = {
 	/*                fg         bg         border   */
-	[SchemeNorm] = { "#bbbbbb", "#222222", "#444444"},
-	[SchemeSel]  = { "#eeeeee", "#005577", "#005577"},
+	[SchemeNorm] = { "#bbbbbb", "#333333", "#444444"},
+	[SchemeSel]  = { "#ffffff", "#37474F", "#42A5F5" },
+	[SchemeHid]  = { "#dddddd",  NULL,      NULL },
 };
 static const unsigned int gapi     = 10; 		/* 窗口与窗口间隔 */
 static const unsigned int gapo	  = 12;	    	/* 窗口与屏幕边的距离 */
@@ -61,8 +62,8 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_s,      spawn,		   SHCMD("rofi -show drun") },	// 启动程序启动器
 	{ MODKEY,             			XK_space,  spawn,          SHCMD("st") },				// 启动终端模拟器
 	{ MODKEY,                       XK_b,      togglebar,      {0} },						// 显示隐藏顶部状态栏
-	{ MODKEY,                       XK_j,      focusstack,     {.i = +1 } },				// 聚焦下一个窗口
-	{ MODKEY,                       XK_k,      focusstack,     {.i = -1 } }, 				// 聚焦上一个窗口
+	{ MODKEY,                       XK_j,      focusstackvis,  {.i = +1 } },				// 聚焦下一个可见窗口
+	{ MODKEY,                       XK_k,      focusstackvis,  {.i = -1 } }, 				// 聚焦上一个可见窗口
 	{ MODKEY,                       XK_i,      incnmaster,     {.i = +1 } },				// 增加 master 窗口数量
 	{ MODKEY,                       XK_d,      incnmaster,     {.i = -1 } },				// 减少 master 窗口数量
 	{ MODKEY,                       XK_h,      setmfact,       {.f = -0.05} },				// 减少 master 窗口占比
@@ -73,6 +74,8 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_period, focusmon,       {.i = +1 } }, 				// 光标移动到下一个显示器
 	{ MODKEY,                       XK_comma,  focusmon,       {.i = -1 } },				// 光标移动到上一个显示器
 	{ MODKEY,                       XK_0,      view,           {.ui = ~0 } }, 				// 选中所有 tag
+	{ MODKEY,              XK_apostrophe,      showclient,     {0} },                       // 显示窗口
+	{ MODKEY,               XK_semicolon,      hideclient,     {0} },                       // 隐藏窗口
 
 	{ MODKEY|ShiftMask,      		XK_space,  spawn,          SHCMD("st -c floatst") },	// 启动终端模拟器
 	{ MODKEY|ShiftMask,             XK_Return, togglefloating, {0} },						// 将聚焦窗口变为浮动窗口
@@ -81,6 +84,8 @@ static const Key keys[] = {
 	{ MODKEY|ShiftMask,             XK_period, tagmon,         {.i = +1 } }, 				// 将聚焦窗口移动到下一个显示器
 	{ MODKEY|ShiftMask,             XK_comma,  tagmon,         {.i = -1 } },				// 将聚焦窗口移动到上一个显示器
 	{ MODKEY|ShiftMask,				XK_s,	   spawn,		   SHCMD("flameshot gui") },	// 截屏
+	{ MODKEY|ShiftMask,             XK_j,      focusstackhid,  {.i = +1 } },				// 聚焦下一个隐藏窗口
+	{ MODKEY|ShiftMask,             XK_k,      focusstackhid,  {.i = -1 } }, 				// 聚焦上一个隐藏窗口
 
 	{ 0,          XF86XK_AudioLowerVolume,     spawn,  SHCMD("amixer set Master 5%-") },	// 减小音量
 	{ 0,          XF86XK_AudioRaiseVolume,     spawn,  SHCMD("amixer set Master 5%+") },	// 增大音量
@@ -116,5 +121,6 @@ static const Button buttons[] = {
 	{ ClkClientWin,         MODKEY,         Button3,        resizemouse,    {0} },  // 调节窗口大小
 	{ ClkTagBar,            0,              Button1,        view,           {0} },  // 点击切换tag
 	{ ClkTagBar,            0,              Button3,        toggleview,     {0} },  // 选中多个tag
+	{ ClkWinTitle,          0,              Button1,        togglewin,      {0} },  // 隐藏/显示窗口
 };
 
