@@ -3,7 +3,7 @@ static const char autostart[] = "~/Code/Shell/autostart.sh";
 /* appearance */
 static const unsigned int borderpx  = 1;        /* border pixel of windows */
 static const unsigned int snap      = 10;       /* snap pixel */
-static const char *fonts[] = { "Monaco:style=Regular:size=15", "JetBrainsMono Nerd Font:style=Medium:size=15" };
+static const char *fonts[] = { "Monaco:style=Regular:size=15", "JetBrainsMono Nerd Font:style=Medium:pixelsize=18" };
 static const unsigned int baralpha = 0xd0;
 static const unsigned int borderalpha = OPAQUE;
 static const unsigned int alphas[][3]      = {
@@ -12,14 +12,18 @@ static const unsigned int alphas[][3]      = {
 	[SchemeSel]  = { OPAQUE, baralpha, borderalpha },
 };
 static const char *colors[][3]      = {
-	/*                fg         bg         border   */
-	[SchemeNorm] = { "#bbbbbb", "#333333", "#444444"},
-	[SchemeSel]  = { "#ffffff", "#37474F", "#42A5F5" },
-	[SchemeHid]  = { "#dddddd",  NULL,      NULL },
+	/*                  fg         bg         border   */
+	[SchemeNorm]    = { "#bbbbbb", "#333333", "#444444"},
+	[SchemeSel]     = { "#ffffff", "#575151", "#41F693" },
+	[SchemeHid]     = { "#dddddd",  NULL,      NULL },
+	[SchemeSystray] = { "#7799AA", "#7799AA", "#7799AA" },
 };
 static const unsigned int gapi     = 10; 		/* 窗口与窗口间隔 */
 static const unsigned int gapo	  = 12;	    	/* 窗口与屏幕边的距离 */
 static const unsigned int defaulttag = 5;		/* 默认选中的tag的下标 */
+static const unsigned int systraypinning = 0;   /* 托盘跟随的显示器 0代表不指定显示器 */
+static const unsigned int systrayspacing = 2;   /* 托盘间距 */
+static int showsystray        = 1;              /* 是否显示托盘栏 */
 
 /* tagging */
 static const char *tags[] = { "", "", "", "", "", "", "", "﬏", "", "", "ﬄ", "﬐", "", "", ""}; // 最多 31 个
@@ -35,6 +39,7 @@ static const Rule rules[] = {
 	 */
 	/* class			instance    title       tags mask     isfloating   isbottom   monitor */
 	{ "floatst",		NULL,       NULL,       0,            1,           0,			-1 },
+	{ "wemeetapp",	    NULL,       NULL,       0,            1,           0,			-1 },
 	{ "st-256color",	NULL,       NULL,       0,            0,           1,			-1 },
 };
 
@@ -86,6 +91,7 @@ static const Key keys[] = {
 	{ MODKEY|ShiftMask,				XK_s,	   spawn,		   SHCMD("flameshot gui") },	// 截屏
 	{ MODKEY|ShiftMask,             XK_j,      focusstackhid,  {.i = +1 } },				// 聚焦下一个隐藏窗口
 	{ MODKEY|ShiftMask,             XK_k,      focusstackhid,  {.i = -1 } }, 				// 聚焦上一个隐藏窗口
+    { MODKEY|ShiftMask,             XK_b,      togglesystray,  {0} },                       // 显示/隐藏托盘
 
 	{ 0,          XF86XK_AudioLowerVolume,     spawn,  SHCMD("amixer set Master 5%-") },	// 减小音量
 	{ 0,          XF86XK_AudioRaiseVolume,     spawn,  SHCMD("amixer set Master 5%+") },	// 增大音量
