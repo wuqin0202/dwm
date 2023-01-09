@@ -24,6 +24,8 @@ static const unsigned int defaulttag = 5;		/* 默认选中的tag的下标 */
 static const unsigned int systraypinning = 0;   /* 托盘跟随的显示器 0代表不指定显示器 */
 static const unsigned int systrayspacing = 2;   /* 托盘间距 */
 static int showsystray        = 1;              /* 是否显示托盘栏 */
+static const int floatwidth = 828;              /* 浮动窗口宽度 */
+static const int floatheight = 512;             /* 浮动窗口高度 */
 
 /* tagging */
 static const char *tags[] = { "", "", "", "", "", "", "", "﬏", "", "", "ﬄ", "﬐", "", "", ""}; // 最多 31 个

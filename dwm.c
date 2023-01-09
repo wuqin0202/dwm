@@ -193,6 +193,7 @@ static void drawbars(void);
 static void enternotify(XEvent *e);
 static void exectagnoc(void);
 static void expose(XEvent *e);
+static void floatmanage(Monitor *m);
 static void focus(Client *c);
 static void focusin(XEvent *e);
 static void focusmon(const Arg *arg);
@@ -209,6 +210,7 @@ static void grabkeys(void);
 static void hide(Client *c);
 static void hideclient(const Arg *arg);
 static void grid(Monitor *m);
+static void gridplace(Client *clients, int x, int y, int w, int h, unsigned int gap, Client* (*next)(Client *c));
 static void incnmaster(const Arg *arg);
 static void keypress(XEvent *e);
 static void killclient(const Arg *arg);
@@ -217,6 +219,7 @@ static void mappingnotify(XEvent *e);
 static void maprequest(XEvent *e);
 static void motionnotify(XEvent *e);
 static void movemouse(const Arg *arg);
+static Client *nextfloat(Client *c);
 static Client *nexttiled(Client *c);
 static void pointertoclient(Client *c);
 static void pop(Client *c);
@@ -1022,6 +1025,34 @@ void expose(XEvent *e)
     }
 }
 
+void
+floatmanage(Monitor *m)
+{
+    unsigned int rows, cols;
+    unsigned int i, n;
+    int w, h;
+    Client *c;
+
+    for (n = 0, c = nextfloat(m->clients); c; c = nextfloat(c->next), n++); 
+    if (n == 0)
+        return;
+    getrowcol(n, &rows, &cols); // 计算 n 个窗口所需要的行列数
+    // 计算屏幕能容纳的窗口数目
+    for (; (w = (cols - 1) * gapi + 2 * gapo + cols * floatwidth > m->ww); cols--);
+    for (; (h = (rows - 1) * gapi + 2 * gapo + rows * floatheight > m->wh); rows--);
+    if (n > rows * cols) // 将多于浮动窗口变为非浮动
+    {
+        n = rows * cols;
+        for (i = 0, c = nextfloat(m->clients); i < n; c = nextfloat(c->next), i++);
+        for (; c; c = nextfloat(c->next))
+            c->isfloating = 0;
+    }
+    // 放置浮动窗口
+    w = (cols - 1) * gapi + cols * floatwidth + 2 * gapo;
+    h = (rows - 1) * gapi + rows * floatheight + 2 * gapo;
+    gridplace(m->clients, m->wx + (m->ww - w) / 2, m->wy + (m->wh - h) / 2, w, h, gapi, nextfloat);
+}
+
 void focus(Client *c)
 {
 	if (!c || !ISVISIBLE(c))
@@ -1403,13 +1434,12 @@ manage(Window w, XWindowAttributes *wa)
 	XChangeProperty(dpy, root, netatom[NetClientList], XA_WINDOW, 32, PropModeAppend,
 					(unsigned char *)&(c->win), 1);
 	XMoveResizeWindow(dpy, c->win, c->x + 2 * sw, c->y, c->w, c->h); /* some windows require this */
-  if (!HIDDEN(c))
     setclientstate(c, NormalState);
 	if (c->mon == selmon)
 		unfocus(selmon->sel, 0);
 	c->mon->sel = c;
+    floatmanage(selmon);
 	arrange(c->mon);
-  if (!HIDDEN(c))
     XMapWindow(dpy, c->win);
 	focus(NULL);
     pointertoclient(selmon->sel);
@@ -1519,6 +1549,13 @@ void movemouse(const Arg *arg)
 		selmon = m;
 		focus(NULL);
 	}
+}
+
+Client
+*nextfloat(Client *c)
+{
+	for (; c && (!c->isfloating || !ISVISIBLE(c) || HIDDEN(c)); c = c->next);
+	return c;
 }
 
 Client *
@@ -2065,8 +2102,6 @@ void showhide(Client *c)
 	{
 		/* show clients top down */
 		XMoveWindow(dpy, c->win, c->x, c->y);
-		if (c->isfloating && !c->isfullscreen)
-			resize(c, c->x, c->y, c->w, c->h, 0);
 		showhide(c->snext);
 	}
 	else
@@ -2169,7 +2204,8 @@ tile(Monitor *m)
     else
         mw = m->ww - 2 * gapo + gapi;
     for (i = 0, my = ty = gapo, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
-        if (i < m->nmaster) {
+        if (i < m->nmaster)
+        {
             r = MIN(n, m->nmaster) - i;
             h = (m->wh - my - gapo - gapi * (r - 1)) / r;
             resize(c,
@@ -2179,7 +2215,9 @@ tile(Monitor *m)
                    h - 2 * c->bw,
                    0);
             my += HEIGHT(c) + gapi;
-        } else {
+        }
+        else
+        {
             r = n - i;
             h = (m->wh - ty - gapo - gapi * (r - 1)) / r;
             resize(c,
@@ -2195,36 +2233,63 @@ tile(Monitor *m)
 void
 grid(Monitor *m)
 {
+    unsigned int n;
+	unsigned int cw, ch;
+    Client *c;
+
+    for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
+    if (n == 0)
+        return;
+    else if (n == 1)
+    {
+        cw = m->ww * 0.7;
+        ch = m->wh * 0.65;
+        c = nexttiled(m->clients);
+        resize(c, m->wx + (m->ww - cw) / 2, m->wy + (m->wh - ch) / 2, cw, ch, 0);
+    }
+    else if (n == 2)
+    {
+        cw = (m->ww - gapi - 2 * gapo) / 2;
+        ch = m->wh * 0.65;
+        c = nexttiled(m->clients);
+        resize(c, m->wx + gapo, m->wy + (m->wh - ch) / 2, cw, ch, 0);
+        resize(nexttiled(c->next), m->wx + gapo + cw + gapi, m->wy + (m->wh - ch) / 2, cw, ch, 0);
+    }
+    else
+        gridplace(m->clients, m->wx + gapo, m->wy + gapo, m->ww - 2 * gapo, m->wh - 2 * gapo, gapi, nexttiled);
+}
+
+void
+gridplace(Client *clients, int x, int y, int w, int h, unsigned int gap, Client* (*next)(Client *c))
+{
 	unsigned int i, j, n;
 	unsigned int cx, cy, cw, ch;
 	unsigned int cols, rows;
-	char overcols;
 	Client *c;
 
-	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
-	if (n == 0) return;
-	for (cols=1; cols <= n/2; cols++)
-		if (cols * cols >= n)
-			break;
-	rows = ((cols - 1) * cols >=n) ? cols - 1 : cols;
+	for (n = 0, c = next(clients); c; c = next(c->next), n++);
+	if (n == 0)
+        return;
+    getrowcol(n, &rows, &cols);
 
-	ch = (m->wh - 2 * gapo - (rows - 1) * gapi) / rows;
-	cw = (m->ww - 2 * gapo - (cols - 1) * gapi) / cols;
+	ch = (h - (rows - 1) * gap) / rows;
+	cw = (w - (cols - 1) * gap) / cols;
 
-	overcols = (char)(n % cols);
-	for (i = 0, c = nexttiled(m->clients), cy = gapo; i < rows; i++) {
-		if (i == rows - 1 && overcols)
-			cx =  (m->ww - (n - i * cols) * (cw + gapi) + gapi) / 2;
-		else
-			cx = gapo;
-		for (j = 0; j < cols; c = nexttiled(c->next), j++) {
-			if (!c) return;
-			resize(c, m->wx + cx, m->wy + cy, cw - 2 * c->bw, ch - 2 * c->bw, 0);
-			cx += cw + gapi;
+	for (i = 0, c = next(clients), cy = y; i < rows - 1; i++)
+    {
+        cx = x;
+		for (j = 0; j < cols; c = next(c->next), j++)
+        {
+			resize(c, cx, cy, cw - 2 * c->bw, ch - 2 * c->bw, 0);
+			cx += cw + gap;
 		}
-		cy += ch + gapi;
+		cy += ch + gap;
 	}
-
+    for (cx =  (w - (n - i * cols) * (cw + gap) + gap) / 2 + x; c; c = next(c->next)) 
+    {
+        resize(c, cx, cy, cw - 2 * c->bw, ch - 2 * c->bw, 0);
+        cx += cw + gap;
+    }
 }
 
 void togglebar(const Arg *arg)

@@ -6,3 +6,4 @@
 
 void die(const char *fmt, ...);
 void *ecalloc(size_t nmemb, size_t size);
+void getrowcol(unsigned int n, unsigned int *row, unsigned int *col);

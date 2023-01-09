@@ -34,3 +34,11 @@ ecalloc(size_t nmemb, size_t size)
 		die("calloc:");
 	return p;
 }
+
+void getrowcol(unsigned int n, unsigned int *row, unsigned int *col)
+{
+	for (*col=1; *col <= n/2; (*col)++)
+		if ((*col) * (*col) >= n)
+			break;
+	*row = ((*col - 1) * (*col) >=n) ? *col - 1 : *col;
+}
