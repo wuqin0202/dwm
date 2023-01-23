@@ -194,7 +194,6 @@ static void drawbars(void);
 static void enternotify(XEvent *e);
 static void exectagnoc(void);
 static void expose(XEvent *e);
-static void floatmanage(Monitor *m);
 static void focus(Client *c);
 static void focusin(XEvent *e);
 static void focusmon(const Arg *arg);
@@ -221,8 +220,8 @@ static void maprequest(XEvent *e);
 static void motionnotify(XEvent *e);
 static void movemouse(const Arg *arg);
 static Client *nextclient(Client *c);
-static Client *nextfloat(Client *c);
 static Client *nexttiled(Client *c);
+static void setfloatingxy(Client *c);
 static void pointertoclient(Client *c);
 static void pop(Client *c);
 static void propertynotify(XEvent *e);
@@ -465,19 +464,19 @@ applysizehints(Client *c, int *x, int *y, int *w, int *h, int interact)
 void
 arrange(Monitor *m)
 {
-	if (m)
-		showhide(m->stack);
-	else    // 初始化
-		for (m = mons; m; m = m->next)
-			showhide(m->stack);
-	if (m)
-	{
-		arrangemon(m);
-		restack(m);
-	}
-	else
-		for (m = mons; m; m = m->next)
-			arrangemon(m);
+    if (m)
+        showhide(m->stack);
+    else    // 初始化
+        for (m = mons; m; m = m->next)
+            showhide(m->stack);
+    if (m)
+    {
+        arrangemon(m);
+        restack(m);
+    }
+    else
+        for (m = mons; m; m = m->next)
+            arrangemon(m);
 }
 
 // 当显示器的窗口改变时调用
@@ -1058,35 +1057,7 @@ void expose(XEvent *e)
     }
 }
 
-void
-floatmanage(Monitor *m)
-{
-    unsigned int rows, cols;
-    unsigned int i, n;
-    int w, h;
-    Client *c;
-
-    for (n = 0, c = nextfloat(m->clients); c; c = nextfloat(c->next), n++); 
-    if (n == 0)
-        return;
-    getrowcol(n, &rows, &cols); // 计算 n 个窗口所需要的行列数
-    // 计算屏幕能容纳的窗口数目
-    for (; (w = (cols - 1) * gapi + 2 * gapo + cols * floatwidth > m->ww); cols--);
-    for (; (h = (rows - 1) * gapi + 2 * gapo + rows * floatheight > m->wh); rows--);
-    if (n > rows * cols) // 将多于浮动窗口变为非浮动
-    {
-        n = rows * cols;
-        for (i = 0, c = nextfloat(m->clients); i < n; c = nextfloat(c->next), i++);
-        for (; c; c = nextfloat(c->next))
-            c->isfloating = 0;
-    }
-    // 放置浮动窗口
-    w = (cols - 1) * gapi + cols * floatwidth + 2 * gapo;
-    h = (rows - 1) * gapi + rows * floatheight + 2 * gapo;
-    gridplace(m->clients, m->wx + (m->ww - w) / 2, m->wy + (m->wh - h) / 2, w, h, gapi, nextfloat);
-}
-
-// 聚焦窗口 c，传递 NULL 自动聚焦选中显示器的 master 窗口
+// 聚焦窗口 c，传递 NULL 自动聚焦
 void
 focus(Client *c)
 {
@@ -1459,7 +1430,15 @@ manage(Window w, XWindowAttributes *wa)
     if (!c->isfloating)
         c->isfloating = c->oldstate = trans != None || c->isfixed;
     if (c->isfloating)
+    {
         XRaiseWindow(dpy, c->win);
+        if (wa->x==0 && wa->y==0)
+        {
+            c->x = selmon->wx + (selmon->ww - c->w) / 2;
+            c->y = selmon->wy + (selmon->wh - c->h) / 2;
+        }
+        setfloatingxy(c);
+    }
     if (c->isbottom)
         attachbottom(c);
     else 
@@ -1472,11 +1451,9 @@ manage(Window w, XWindowAttributes *wa)
     if (c->mon == selmon)
         unfocus(selmon->sel, 0);
     c->mon->sel = c;
-    floatmanage(c->mon);
     arrange(c->mon);
     XMapWindow(dpy, c->win);
     focus(NULL);
-    pointertoclient(c);
 }
 
 void mappingnotify(XEvent *e)
@@ -1591,18 +1568,44 @@ Client
     return c;
 }
 
-Client
-*nextfloat(Client *c)
-{
-    for (; c && (!c->isfloating || !ISVISIBLE(c) || HIDDEN(c)); c = c->next);
-    return c;
-}
-
 Client *
 nexttiled(Client *c)
 {
     for (; c && (c->isfloating || !ISVISIBLE(c) || HIDDEN(c)); c = c->next);
     return c;
+}
+
+void
+setfloatingxy(Client *c)
+{
+    Client *tc;
+    int d1 = 0, d2 = 0, tx, ty;
+    int tryed = 0;
+    while (tryed++ < 10)
+    {
+        int dw, dh, existed = 0;
+        dw = (selmon->ww / 20) * d1, dh = (selmon->wh / 20) * d2;
+        tx = c->x + dw, ty = c->y + dh;
+        for (tc = selmon->clients; tc; tc = tc->next)
+        {
+            if (ISVISIBLE(tc) && !HIDDEN(tc) && tc != c && tc->x == tx && tc->y == ty)
+            {
+                existed = 1;
+                break;
+            }
+        }
+        if (!existed)
+        {
+            c->x = tx;
+            c->y = ty;
+            break;
+        }
+        else
+        {
+            while (d1 == 0) d1 = rand()%7 - 3;
+            while (d2 == 0) d2 = rand()%7 - 3;
+        }
+    }
 }
 
 void
@@ -1620,7 +1623,6 @@ void pop(Client *c)
     detach(c);
     attach(c);
     focus(c);
-    pointertoclient(c);
     arrange(c->mon);
 }
 
@@ -2047,7 +2049,7 @@ void setup(void)
     netatom[NetSystemTrayOP] = XInternAtom(dpy, "_NET_SYSTEM_TRAY_OPCODE", False);
     netatom[NetSystemTrayOrientation] = XInternAtom(dpy, "_NET_SYSTEM_TRAY_ORIENTATION", False);
     netatom[NetSystemTrayOrientationHorz] = XInternAtom(dpy, "_NET_SYSTEM_TRAY_ORIENTATION_HORZ", False);
-    netatom[NetWMName] = XInternAtom(dpy, "_NET_WM_ICON_NAME", False);
+    netatom[NetWMName] = XInternAtom(dpy, "WM_CLASS", False);
     netatom[NetWMState] = XInternAtom(dpy, "_NET_WM_STATE", False);
     netatom[NetWMCheck] = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
     netatom[NetWMFullscreen] = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
@@ -2190,7 +2192,10 @@ togglewin(const Arg *arg)
     }
     else
     {
+        if (c->ishide)
+            show(c);
         focus(c);
+        arrangemon(selmon);
         restack(selmon);
     }
 }
@@ -2379,8 +2384,13 @@ void togglefloating(const Arg *arg)
         return;
     selmon->sel->isfloating = !selmon->sel->isfloating || selmon->sel->isfixed;
     if (selmon->sel->isfloating)
+    {
+        selmon->sel->x = selmon->wx + selmon->ww / 6,
+        selmon->sel->y = selmon->wy + selmon->wh / 6,
+        setfloatingxy(selmon->sel);
         resize(selmon->sel, selmon->sel->x, selmon->sel->y,
-               selmon->sel->w, selmon->sel->h, 0);
+               selmon->sel->w / 3 * 2, selmon->sel->h / 3 * 2, 0);
+    }
     arrange(selmon);
     pointertoclient(selmon->sel);
 }
@@ -2394,7 +2404,6 @@ toggleoverview(const Arg *arg)
     {
         selmon->tagset[selmon->seltags] = oldtag;
         selmon->seltags ^= 1;
-        floatmanage(selmon);
         correct(selmon);
     }
     else

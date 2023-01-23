@@ -2,30 +2,28 @@ static const char autostart[] = "~/Code/Shell/autostart.sh";
 
 /* appearance */
 static const unsigned int borderpx  = 1;        /* border pixel of windows */
-static const unsigned int snap      = 10;       /* snap pixel */
+static const unsigned int snap = 10;       /* snap pixel */
 static const char *fonts[] = { "Monaco:style=Regular:size=15", "JetBrainsMono Nerd Font:style=Medium:pixelsize=18" };
 static const unsigned int baralpha = 0xd0;
 static const unsigned int borderalpha = OPAQUE;
-static const unsigned int alphas[][3]      = {
+static const unsigned int alphas[][3] = {
     /*               fg      bg        border     */
     [SchemeNorm] = { OPAQUE, baralpha, borderalpha },
     [SchemeSel]  = { OPAQUE, baralpha, borderalpha },
 };
-static const char *colors[][3]      = {
+static const char *colors[][3] = {
     /*                  fg         bg         border   */
     [SchemeNorm]    = { "#bbbbbb", "#333333", "#444444"},
     [SchemeSel]     = { "#ffffff", "#575151", "#41F693" },
     [SchemeHid]     = { "#dddddd",  NULL,      NULL },
     [SchemeSystray] = { "#7799AA", "#7799AA", "#7799AA" },
 };
-static const unsigned int gapi     = 10;        /* 窗口与窗口间隔 */
-static const unsigned int gapo    = 12;         /* 窗口与屏幕边的距离 */
+static const unsigned int gapi = 8;             /* 窗口与窗口间隔 */
+static const unsigned int gapo = 12;            /* 窗口与屏幕边的距离 */
 static const unsigned int defaulttag = 5;       /* 默认选中的tag的下标 */
 static const unsigned int systraypinning = 0;   /* 托盘跟随的显示器 0代表不指定显示器 */
 static const unsigned int systrayspacing = 2;   /* 托盘间距 */
 static int showsystray        = 1;              /* 是否显示托盘栏 */
-static const int floatwidth = 828;              /* 浮动窗口宽度 */
-static const int floatheight = 512;             /* 浮动窗口高度 */
 static const char *overviewsymbol = "";
 
 /* tagging */
@@ -33,22 +31,25 @@ static const char *tags[] = { "", "", "", "", "", "", "", "
 
 /* tagcmds */
 static const char *tagcmds[] = { NULL, NULL, NULL, NULL, NULL,\
-    "st", "chromium", NULL, "pcmanfm", "wps", "tencent-qq", "electronic-wechat-uos-bin", "netease-cloud-music-gtk4", "virt-manager", "obs"};
+    "st", "chromium", NULL, "pcmanfm", "wps", "linuxqq", "electronic-wechat-uos-bin", "netease-cloud-music-gtk4", "virt-manager", "obs"};
 
 static const Rule rules[] = {
     /* xprop(1):
      *  WM_CLASS(STRING) = instance, class
      *  WM_NAME(STRING) = title
      */
-    /* class            instance    title       tags mask     isfloating   isbottom   monitor */
-    { "floatst",        NULL,       NULL,       0,            1,           0,           -1 },
-    { "wemeetapp",      NULL,       NULL,       0,            1,           0,           -1 },
-    { "st-256color",    NULL,       NULL,       0,            0,           1,           -1 },
+    /* class               instance    title       tags mask isfloating isbottom monitor */
+    { "floatst",           NULL,       NULL,       0,        1,         0,       -1 },
+    { "wemeetapp",         NULL,       NULL,       0,        1,         0,       -1 },
+    { "st",                NULL,       NULL,       0,        0,         1,       -1 },
+    { "chromium",          NULL,       NULL,       1 << 6,   0,         1,       -1 },
+    { "qq",                NULL,       NULL,       1 << 10,  0,         1,       -1 },
+    { "electronic-wechat", NULL,       NULL,       1 << 11,  0,         1,       -1 },
 };
 
 /* layout(s) */
-static const float mfact     = 0.62; /* factor of master area size [0.05..0.95] */
-static const int lockfullscreen = 1; /* 1 will force focus on the fullscreen window */
+static const float mfact = 0.62; /* factor of master area size [0.05..0.95] */
+static const int lockfullscreen = 0; /* 1 will force focus on the fullscreen window */
 
 static const Layout layouts[] = {
     /* symbol     arrange function(不能为NULL) */
