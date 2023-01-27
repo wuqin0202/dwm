@@ -75,13 +75,13 @@
 
 /* enums */
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
-enum { SchemeNorm, SchemeSel, SchemeHid, SchemeSystray }; /* color schemes */
+enum { SchemeNorm, SchemeSel, SchemeHid, SchemeNormTag, SchemeSelTag, SchemeBarEmpty, SchemeSystray }; /* color schemes */
 enum { NetSupported, NetWMName, NetWMState, NetWMCheck,
        NetSystemTray, NetSystemTrayOP, NetSystemTrayOrientation, NetSystemTrayOrientationHorz,
        NetWMFullscreen, NetActiveWindow, NetWMWindowType,
        NetWMWindowTypeDialog, NetClientList, NetLast }; /* EWMH atoms */
 enum { Manager, Xembed, XembedInfo, XLast }; /* Xembed atoms */
-enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMLast }; /* default atoms */
+enum { WMProtocols, WMDelete, WMState, WMTakeFocus, WMClass, WMLast }; /* default atoms */
 enum { ClkTagBar, ClkLtSymbol, ClkStatusText, ClkWinTitle,
        ClkClientWin, ClkRootWin, ClkLast }; /* clicks */
 
@@ -191,6 +191,7 @@ static void detachstack(Client *c);
 static Monitor *dirtomon(int dir);
 static void drawbar(Monitor *m);
 static void drawbars(void);
+static int drawstatus(Monitor *m);
 static void enternotify(XEvent *e);
 static void exectagnoc(void);
 static void expose(XEvent *e);
@@ -288,9 +289,10 @@ static void xinitvisual(void);
 static void zoom(const Arg *arg);
 
 /* variables */
+static Clr *status_scm;
 static Systray *systray = NULL;
 static const char broken[] = "broken";
-static char stext[256];
+static char stext[1024];
 static int screen;
 static int sw, sh; /* X display screen geometry width, height */
 static int bh;     /* bar height */
@@ -357,9 +359,9 @@ applyrules(Client *c)
     for (i = 0; i < LENGTH(rules); i++)
     {
         r = &rules[i];
-        if ((!r->title || strstr(c->name, r->title)) &&
-            (!r->class || strstr(class, r->class)) &&
-            (!r->instance || strstr(instance, r->instance)))
+        if ((!r->title || strcmp(c->name, r->title) == 0) &&
+            (!r->class || strcmp(class, r->class) == 0) &&
+            (!r->instance || strcmp(instance, r->instance) == 0))
         {
             c->isfloating = r->isfloating;
             c->isbottom = r->isbottom;
@@ -928,7 +930,7 @@ dirtomon(int dir)
 
 void drawbar(Monitor *m)
 {
-    int x, w, scm, empty_w, systray_w = 0, status_w = 0;
+    int x, w, scm, empty_w = m->ww - 2 * barpadh, systray_w = 0, status_w = 0;
     unsigned int i, occ = 0, urg = 0;
     Client *c;
 
@@ -937,13 +939,10 @@ void drawbar(Monitor *m)
     // 获取系统托盘宽度
     if(showsystray && m == systraytomon(m))
         systray_w = getsystraywidth();
+    empty_w -= systray_w;
     // 首先绘制 status 以便后面可被覆盖
     if (m == selmon) // status 只在选中显示器绘制
-    {
-        drw_setscheme(drw, scheme[SchemeNorm]);
-        status_w = TEXTW(stext) - lrpad / 2 + 2; /* 2px right padding */
-        drw_text(drw, m->ww - status_w - systray_w, 0, status_w, bh, lrpad / 2, stext, 0);
-    }
+        status_w = drawstatus(m);
     resizebarwin(m);
 
     for (c = m->clients; c; c = c->next)
@@ -969,7 +968,7 @@ void drawbar(Monitor *m)
             if(!(occ & 1 << i || m->tagset[m->seltags] & 1 << i)) // 跳过空闲的(无窗口) tag
                 continue;
             w = TEXTW(tags[i]);
-            drw_setscheme(drw, scheme[m->tagset[m->seltags] & 1 << i ? SchemeSel : SchemeNorm]);
+            drw_setscheme(drw, scheme[m->tagset[m->seltags] & 1 << i ? SchemeSelTag : SchemeNormTag]);
             drw_text(drw, x, 0, w, bh, lrpad / 2, tags[i], urg & 1 << i);
             x += w;
         }
@@ -978,7 +977,7 @@ void drawbar(Monitor *m)
     drw_setscheme(drw, scheme[SchemeNorm]);
     x = drw_text(drw, x, 0, w, bh, lrpad / 2, m->ltsymbol, 0);
     // 绘制 title
-    empty_w = m->ww - status_w - systray_w - x;
+    empty_w = empty_w - status_w - x;
     for (c = m->clients; c; c = c->next)
     {
         if (!ISVISIBLE(c))
@@ -1010,10 +1009,10 @@ void drawbar(Monitor *m)
     }
     if (empty_w > 0) // 填充剩余宽度
     {
-        drw_setscheme(drw, scheme[SchemeHid]);
+        drw_setscheme(drw, scheme[SchemeBarEmpty]);
         drw_rect(drw, x, 0, empty_w, bh, 1, 1);
     }
-    drw_map(drw, m->barwin, 0, 0, m->ww - systray_w, bh);
+    drw_map(drw, m->barwin, 0, 0, m->ww - systray_w - 2 * barpadh, bh);
 }
 
 void drawbars(void)
@@ -1022,6 +1021,55 @@ void drawbars(void)
 
     for (m = mons; m; m = m->next)
         drawbar(m);
+}
+
+int
+drawstatus(Monitor *m)
+{
+    int status_w = 0,
+        system_w = 0,
+        x, w, start, end, count;
+    unsigned int alpha;
+    char buf8[8] = { [7] = 0 }, buf5[5] = { [4] = 0 },
+         text[64];
+
+    if (showsystray && m == systraytomon(m))
+        system_w = getsystraywidth();
+
+    // 从后往前绘制
+    x = m->ww - system_w - 2 * barpadh;
+    end = strlen(stext);
+    while (end > 0)
+    {
+        count = 0;
+        for (start = end - 1; start >= 0; start--)
+        {
+            if (stext[start] == '#')
+                count++;
+            if (count == 2)
+                break;
+        }
+        if (count == 2)
+        {
+            strncpy(buf8, stext+start, 7);
+            strncpy(buf5, stext+start+7, 4);
+            sscanf(buf5, "%x", &alpha);
+            drw_clr_create(drw, &status_scm[ColFg], buf8, alpha);
+            strncpy(buf8, stext+start+11, 7);
+            strncpy(buf5, stext+start+18, 4);
+            sscanf(buf5, "%x", &alpha);
+            drw_clr_create(drw, &status_scm[ColBg], buf8, alpha);
+            strncpy(text, stext+start+22, end-start-22), text[end-start-22] = 0;
+            // 开始绘制
+            drw_setscheme(drw, status_scm);
+            w = TEXTW(text) - lrpad;
+            x -= w;
+            drw_text(drw, x, 0, w, bh, 0, text, 0);
+            status_w += w;
+        }
+        end = start;
+    }
+    return status_w;
 }
 
 void enternotify(XEvent *e)
@@ -1235,7 +1283,7 @@ getsystraywidth(void)
     Client *i;
     if(showsystray)
         for(i = systray->icons; i; w += i->w + systrayspacing, i = i->next) ;
-    return w ? w + systrayspacing : 1;
+    return w ? w + systrayspacing + 2 * barpadh : 1;
 }
 
 int gettextprop(Window w, Atom atom, char *text, unsigned int size)
@@ -1724,7 +1772,7 @@ resizebarwin(Monitor *m) {
     unsigned int w = m->ww;
     if (showsystray && m == systraytomon(m))
         w -= getsystraywidth();
-    XMoveResizeWindow(dpy, m->barwin, m->wx, m->by, w, bh);
+    XMoveResizeWindow(dpy, m->barwin, m->wx + barpadh, m->by, w - 2 * barpadh, bh);
 }
 
 void resizeclient(Client *c, int x, int y, int w, int h)
@@ -2043,13 +2091,14 @@ void setup(void)
     wmatom[WMDelete] = XInternAtom(dpy, "WM_DELETE_WINDOW", False);
     wmatom[WMState] = XInternAtom(dpy, "WM_STATE", False);
     wmatom[WMTakeFocus] = XInternAtom(dpy, "WM_TAKE_FOCUS", False);
+    wmatom[WMClass] = XInternAtom(dpy, "WM_CLASS", False);
     netatom[NetActiveWindow] = XInternAtom(dpy, "_NET_ACTIVE_WINDOW", False);
    netatom[NetSupported] = XInternAtom(dpy, "_NET_SUPPORTED", False);
     netatom[NetSystemTray] = XInternAtom(dpy, "_NET_SYSTEM_TRAY_S0", False);
     netatom[NetSystemTrayOP] = XInternAtom(dpy, "_NET_SYSTEM_TRAY_OPCODE", False);
     netatom[NetSystemTrayOrientation] = XInternAtom(dpy, "_NET_SYSTEM_TRAY_ORIENTATION", False);
     netatom[NetSystemTrayOrientationHorz] = XInternAtom(dpy, "_NET_SYSTEM_TRAY_ORIENTATION_HORZ", False);
-    netatom[NetWMName] = XInternAtom(dpy, "WM_CLASS", False);
+    netatom[NetWMName] = XInternAtom(dpy, "_NET_WM_NAME", False);
     netatom[NetWMState] = XInternAtom(dpy, "_NET_WM_STATE", False);
     netatom[NetWMCheck] = XInternAtom(dpy, "_NET_SUPPORTING_WM_CHECK", False);
     netatom[NetWMFullscreen] = XInternAtom(dpy, "_NET_WM_STATE_FULLSCREEN", False);
@@ -2067,6 +2116,7 @@ void setup(void)
     scheme = ecalloc(LENGTH(colors), sizeof(Clr *));
     for (i = 0; i < LENGTH(colors); i++)
         scheme[i] = drw_scm_create(drw, colors[i], alphas[i], 3);
+    status_scm = ecalloc(2, sizeof(XftColor));
     /* init system tray */
     updatesystray();
     /* init bars */
@@ -2156,6 +2206,8 @@ void showhide(Client *c)
     {
         /* show clients top down */
         XMoveWindow(dpy, c->win, c->x, c->y);
+        if (c->isfloating && !c->isfullscreen)
+            resize(c, c->x, c->y, c->w, c->h, 0);
         showhide(c->snext);
     }
     else
@@ -2528,7 +2580,7 @@ void updatebars(void)
         w = m->ww;
         if (showsystray && m == systraytomon(m))
             w -= getsystraywidth();
-        m->barwin = XCreateWindow(dpy, root, m->wx, m->by, w, bh, 0, depth,
+        m->barwin = XCreateWindow(dpy, root, m->wx + barpadh, m->by, w - 2 * barpadh, bh, 0, depth,
                                   InputOutput, visual,
                                   CWOverrideRedirect|CWBackPixel|CWBorderPixel|CWColormap|CWEventMask, &wa);
         XDefineCursor(dpy, m->barwin, cursor[CurNormal]->cursor);
@@ -2545,9 +2597,9 @@ void updatebarpos(Monitor *m)
     m->wh = m->mh;
     if (m->showbar)
     {
-        m->wh -= bh;
-        m->by = m->topbar ? m->wy : m->wy + m->wh;
-        m->wy = m->topbar ? m->wy + bh : m->wy;
+        m->wh = m->wh - bh - barpadv;
+        m->by = m->topbar ? m->wy + barpadv : m->wy + m->wh - barpadv;
+        m->wy = m->topbar ? m->wy + bh + barpadv : m->wy;
     }
     else
         m->by = -bh;
@@ -2835,7 +2887,7 @@ updatesystray(void)
             i->mon = m;
     }
     w = w ? w + systrayspacing : 1;
-    x -= w;
+    x = x - w - barpadh;
     XMoveResizeWindow(dpy, systray->win, x, m->by, w, bh);
     wc.x = x; wc.y = m->by; wc.width = w; wc.height = bh;
     wc.stack_mode = Above; wc.sibling = m->barwin;
@@ -2847,7 +2899,7 @@ updatesystray(void)
 
 void updatetitle(Client *c)
 {
-    if (!gettextprop(c->win, netatom[NetWMName], c->name, sizeof c->name))
+    if (!gettextprop(c->win, wmatom[WMClass], c->name, sizeof c->name))
         gettextprop(c->win, XA_WM_NAME, c->name, sizeof c->name);
     if (c->name[0] == '\0') /* hack to mark broken clients */
         strcpy(c->name, broken);
@@ -3080,6 +3132,6 @@ int main(int argc, char *argv[])
     run();
     cleanup();
     XCloseDisplay(dpy);
-    system("sudo prime-switch > /var/log/dwm/switch.log");
+//    system("sudo prime-switch > /var/log/dwm/switch.log");
     return EXIT_SUCCESS;
 }

@@ -1,29 +1,39 @@
-static const char autostart[] = "~/Code/Shell/autostart.sh";
+static const char autostart[] = "~/Code/Shell/dwm/autostart.sh &";
 
 /* appearance */
-static const unsigned int borderpx  = 1;        /* border pixel of windows */
-static const unsigned int snap = 10;       /* snap pixel */
-static const char *fonts[] = { "Monaco:style=Regular:size=15", "JetBrainsMono Nerd Font:style=Medium:pixelsize=18" };
+static const int borderpx  = 1;        /* border pixel of windows */
+static const int snap = 10;       /* snap pixel */
+static const char *fonts[] = { "Monaco:style=Regular:size=15", "JetBrainsMono Nerd Font:style=Medium:pixelsize=20" };
+static const int barpadh = 5;
+static const int barpadv = 7;
 static const unsigned int baralpha = 0xd0;
 static const unsigned int borderalpha = OPAQUE;
 static const unsigned int alphas[][3] = {
-    /*               fg      bg        border     */
-    [SchemeNorm] = { OPAQUE, baralpha, borderalpha },
-    [SchemeSel]  = { OPAQUE, baralpha, borderalpha },
+    /*                   fg      bg        border     */
+    [SchemeNorm]     = { OPAQUE, baralpha, borderalpha },
+    [SchemeSel]      = { OPAQUE, baralpha, borderalpha },
+    [SchemeHid]      = { 0x00,   0x00,     0x00 },
+    [SchemeNormTag]  = { OPAQUE, baralpha, borderalpha }, 
+    [SchemeSelTag]   = { OPAQUE, baralpha, borderalpha },
+    [SchemeBarEmpty] = { 0x00,   0x0a,     0x00 },
+    [SchemeSystray]  = { OPAQUE, baralpha, borderalpha },
 };
 static const char *colors[][3] = {
     /*                  fg         bg         border   */
-    [SchemeNorm]    = { "#bbbbbb", "#333333", "#444444"},
-    [SchemeSel]     = { "#ffffff", "#575151", "#41F693" },
-    [SchemeHid]     = { "#dddddd",  NULL,      NULL },
-    [SchemeSystray] = { "#7799AA", "#7799AA", "#7799AA" },
+    [SchemeNorm]     = { "#bbbbbb", "#333333", "#444444" },
+    [SchemeSel]      = { "#ffffff", "#37474F", "#42A5F5" },
+    [SchemeHid]      = { "#dddddd",  NULL,      NULL },
+    [SchemeNormTag]  = { "#bbbbbb", "#333333",  NULL },
+    [SchemeSelTag]   = { "#eeeeee", "#394857",  NULL },
+    [SchemeBarEmpty] = {  NULL,     "#111111",  NULL },
+    [SchemeSystray]  = {  NULL,     "#7799AA",  NULL },
 };
-static const unsigned int gapi = 8;             /* 窗口与窗口间隔 */
-static const unsigned int gapo = 12;            /* 窗口与屏幕边的距离 */
-static const unsigned int defaulttag = 5;       /* 默认选中的tag的下标 */
-static const unsigned int systraypinning = 0;   /* 托盘跟随的显示器 0代表不指定显示器 */
-static const unsigned int systrayspacing = 2;   /* 托盘间距 */
-static int showsystray        = 1;              /* 是否显示托盘栏 */
+static const int gapi = 8;             /* 窗口与窗口间隔 */
+static const int gapo = 12;            /* 窗口与屏幕边的距离 */
+static const int defaulttag = 5;       /* 默认选中的tag的下标 */
+static const int systraypinning = 0;   /* 托盘跟随的显示器 0代表不指定显示器 */
+static const int systrayspacing = 2;   /* 托盘间距 */
+static int showsystray = 1;            /* 是否显示托盘栏 */
 static const char *overviewsymbol = "";
 
 /* tagging */
